@@ -10,13 +10,14 @@
 #  ░░░░░░░░░   ░░░░░░░░░                            
 #                                                    
 # =============================================================
-# A program to identify loops in X12/edi and segment count.
+# A program to identify loops in X12/edi.
 # =============================================================
 
 import os
 import sys
 import loopinfo
 from loopinfo import bc
+from random import randint
 
 # Separator for segment parts
 DELIMITER="*"
@@ -38,10 +39,14 @@ FILE_MARKER="SSEDI"
 
 logs = []
 
+GENERATE_RAND = False
+HL_MODIFIER = True
+
 class SegmentCounter:
 	counting = False
 	count = 0
 	start = 0
+	generated_id = 0
 
 class ClaimAmountCheck:
 	clm_pos = 0
@@ -49,6 +54,9 @@ class ClaimAmountCheck:
 	sv2_sum = 0
 	sv2_pos = []
 	active = False
+
+class HLTracker:
+	counter = 1
 
 
 def find_non_whitespace_character(string: str):
@@ -143,6 +151,10 @@ def handle_segment_count(item, index):
 		SegmentCounter.counting = True
 		SegmentCounter.start = index
 		SegmentCounter.count = 0
+		SegmentCounter.generated_id = randint(10**8, 10**9 -1)
+
+		if GENERATE_RAND:
+			item[SEGMENT][2] = str(SegmentCounter.generated_id)
 
 	if (SegmentCounter.counting):
 		SegmentCounter.count += 1
@@ -157,11 +169,19 @@ def handle_segment_count(item, index):
 			logs.append((index, f"Segment Count for SE mismatch, updating to {SegmentCounter.count}"))
 			item[SEGMENT][1] = str(SegmentCounter.count)
 
+		if GENERATE_RAND:
+			item[SEGMENT][2] = str(SegmentCounter.generated_id)
+
+
+		SegmentCounter.counting = False
+
+	return item
+
 
 def handle_claim_sum(item, index):
 	if (item[SEGMENT][0] == "CLM"):
 		if (ClaimAmountCheck.active):
-			print(f"Recieved two CMLs in a row at {ClaimAmountCheck.clm_pos+1} and {index+1}. Exiting.")
+			print(f"Recieved two CLMs in a row at {ClaimAmountCheck.clm_pos+1} and {index+1}. Exiting.")
 			exit(1)
 
 		ClaimAmountCheck.active = True
@@ -186,6 +206,45 @@ def handle_claim_sum(item, index):
 		if (ClaimAmountCheck.sv2_sum != ClaimAmountCheck.clm_total):
 			print(f"{bc.FAIL}CLM total mismatch. SV2 total: {ClaimAmountCheck.sv2_sum}, CLM total: {ClaimAmountCheck.clm_total}{bc.ENDC}")
 			print(f"\t SV2 segments lines: {ClaimAmountCheck.sv2_pos} and CLM segment line: {ClaimAmountCheck.clm_pos}")
+
+		ClaimAmountCheck.active = False
+
+	return item
+
+def handle_hl_tags(item, index):
+
+	if HL_MODIFIER:
+		if (item[SEGMENT][0] == "SE"):
+			HLTracker.counter = 1
+
+		if (item[SEGMENT][0] == "HL"):
+			item[SEGMENT][1] = str(HLTracker.counter)
+			HLTracker.counter += 1
+
+			if (len(item[SEGMENT]) != 5):
+				item[SEGMENT] = item[SEGMENT].insert(2, "")
+
+
+	if (item[SEGMENT][0] == "HL" and item[SEGMENT][3] == "20"):
+		if (item[SEGMENT][2] != ""):
+			logs.append((index, f"HL Billing Provider Level had value for 2nd element, removed."))
+			item[SEGMENT][2] = ""
+
+		if (item[SEGMENT][4] != "1"):
+			logs.append((index, f"HL Billing Provider Level 4th element was NOT set to 1. Updated."))
+			item[SEGMENT][4] = "1"
+
+	if (item[SEGMENT][0] == "HL" and item[SEGMENT][3] == "22"):
+		if (item[SEGMENT][2] != "1"):
+			logs.append((index, f"HL Subscriber Level 2nd element was NOT set to 1, updated."))
+			item[SEGMENT][2] = "1"
+
+		if (item[SEGMENT][4] != "0"):
+			logs.append((index, f"HL Subscriber Level 4th element was NOT set to 0. Updated."))
+			item[SEGMENT][4] = "0"
+
+
+	return item
 
 def main():
 	args = sys.argv
@@ -223,9 +282,10 @@ def main():
 			# Comment segment
 			continue
 
-		handle_segment_count(item, index)
-		handle_claim_sum(item, index)
-		
+		item = handle_segment_count(item, index)
+		item = handle_claim_sum(item, index)
+		item = handle_hl_tags(item, index)
+
 		loop_item = loopinfo.check_loop_start(loopinfo.LOOP_INFO, segment)
 
 		# Current item is loop and has not already been documented in the previous line
@@ -233,6 +293,8 @@ def main():
 			additions.append(
 				(index, "\n", f"// {FILE_MARKER} Loop: {loop_item.name} :: {loop_item.desc}", "\n")
 			)
+
+		data[index] = item
 
 	for addition in reversed(additions):
 		data.insert(addition[0], {
@@ -244,7 +306,7 @@ def main():
 	# ------------------------------------------------------------
 
 	new_lines = edi_array_to_lines(data)
-	with open(filename, 'w') as f:
+	with open(f"{fname_without_ext}-withloops{ext}", 'w') as f:
 		f.writelines(new_lines)
 
 

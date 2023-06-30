@@ -86,18 +86,30 @@ LOOP_INFO = [
 LoopObject("1000A",  [("NM1", "41")], [("PER",)], [], "Submitter Name", 1, True, None),
 LoopObject("1000B",  [("NM1", "40")], [], [], "Receiver Name", 1, True, None),
 
-LoopObject("2000A",  [("HL", COUNTER)], [], [("PRV",), ("CUR",)], "Receiver Name", 1, True, None),
-LoopObject("2010AA", [("NM", "85")], [("REF",)], [("PER",)], "Billing Provider Name", 1, True, "2000A"),
+LoopObject("2000A",  [("HL", "*", "*","20")], [], [("PRV",), ("CUR",)], "Provider Hierarchical Level", 1, True, None),
+LoopObject("2010AA", [("NM1", "85")], [("REF",)], [("PER",)], "Billing Provider Name", 1, True, "2000A"),
 LoopObject("2010AB", [("NM1", "87")], [("REF",)], [], "Pay to address name", 1, False, "2000A"),
 LoopObject("2010AC", [("NM1", "PE")], [("REF",), ("REF",)], [], "Pay to plan name", 1, False, "2000A"),
 
-LoopObject("2000B",  [("HL", "*", "*","22")], [("SBR",)], [], "Subscriber Detail", INF, True, None),
+LoopObject("2000B",  [("HL", "*", "*","22")], [("SBR",)], [], "Subscriber Hierarchial Level", INF, True, None),
 LoopObject("2010BA", [("NM1", "IL")], [("REF",), ("REF",)], [], "Subscriber Name", 1, True, "2000B"),
 LoopObject("2010BB-1", [("NM1", "AO")], [("REF",)], [], "Account Holder Name", 1, True, "2000B"),
 LoopObject("2010BB-2", [("NM1", "PR")], [("REF",), ("REF",)], [], "Payer Name", 1, True, "2000B"),
 LoopObject("2010BD", [("NM1", "QD")], [("N3",), ("N4",)], [], "Responsible Party Name", 1, False, "2000B"),
 
-LoopObject("2000C", [("HL", "QD")], [("N3",), ("N4",)], [], "Patient Hierarchical Level", 1, False, "2000B"),
+LoopObject("2000C", [("HL", "*", "*","23")], [("N3",), ("N4",)], [], "Patient Hierarchical Level", 1, False, None),
+LoopObject("2010CA", [("NM1", "QC")], [], [], "Patient Name", 1, False, "2000C"),
+LoopObject("2300", [("CLM",)], [], [], "Claim Information", 1, True, "2000C"),
+LoopObject("2310A", [("NM1","71")], [], [], "Attending Provider", 1, False, "2300"),
+LoopObject("2310A", [("NM1","72")], [], [], "Operating Physician", 1, False, "2300"),
+LoopObject("2310D", [("NM1","82")], [], [], "Rendering Provider", 1, False, "2300"),
+LoopObject("2310E", [("NM1","77")], [], [], "Service Location", 1, False, "2300"),
+LoopObject("2310F", [("NM1","DN")], [], [], "Referring Provider", 1, False, "2300"),
+LoopObject("2320", [("SBR","S")], [], [], "Other Subscriber Info", 1, False, "2300"),
+LoopObject("2330A", [("NM1","IL")], [], [], "Other Subscriber Name", 1, False, "2320"),
+LoopObject("2400", [("LX",)], [], [], "Service Line", 1, False, "2300"),
+LoopObject("2410", [("LIN",)], [], [], "Drug Information", 1, False, "2400"),
+LoopObject("2430", [("SVD",)], [], [], "Line Adjudication Info", 1, False, "2400"),
 ]
 
 set_parent(LOOP_INFO)

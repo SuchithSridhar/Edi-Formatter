@@ -50,6 +50,9 @@ for i, line in enumerate(data, 1):
 		logs.append(("Removed tabs on line", i))
 		line = l2
 
+	if len(line) == 0:
+		continue
+
 	if line[:2] == "//":
 		logs.append(("Removed comment on line",i))
 		continue
