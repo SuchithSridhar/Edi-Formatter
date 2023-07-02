@@ -604,6 +604,14 @@ def print_opts(opts: dict):
 
 def fix_errors_module(index, item, opts, additions, deletions):
 
+    # Empty line
+    if (len(item[SEGMENT]) == 0):
+        return item
+
+    # Comment line
+    if item[SEGMENT][0].startswith("//"):
+        return item
+
     if (opts[OPT_SEG_COUNT]):
         item = handle_segment_count(item, index)
 
