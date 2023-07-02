@@ -79,7 +79,8 @@ Help:
     Fix Error Options (only applies for -fix-errors):
         {bc.OKCYAN}-gen-uuid{bc.ENDC} : generate unique ID's for ST and SE control numbers.
         {bc.OKCYAN}-claim-amount{bc.ENDC} : Validate the total claim amount.
-        {bc.OKCYAN}-hl-num{bc.ENDC} : Number the HL segments according to their occurance order.
+        {bc.OKCYAN}-hl-num{bc.ENDC} : Number the HL segments within ST-SE according to their occurance order.
+        {bc.OKCYAN}-lx-num{bc.ENDC} : Number the LX segments within CLM according to their occurance order.
 
         {bc.OKCYAN}-hl-logic-off{bc.ENDC} : Don't fix HL segment logic (on by default).
         {bc.OKCYAN}-seg-count-off{bc.ENDC} : Don't update segment count (on by default).
@@ -96,6 +97,7 @@ OPT_CLM_AMT = '-claim-amount'
 OPT_HL_LOGIC = '-hl-logic-off'
 OPT_SEG_COUNT = '-seg-count-off'
 OPT_INPUT_FILE = 'input-file'
+OPT_LX_NUM = '-lx-num'
 
 LOG_WARN = 'warn'
 LOG_ERROR = 'error'
@@ -315,19 +317,10 @@ def parse_edi_to_array(lines: list[str]):
         try:
             index_tilda = line.index(TERMINATOR)
         except ValueError:
-            if (not line[index_start:].startswith(COMMENT)):
-                if (NEWLINE in line):
-                    index_tilda = line.index(NEWLINE)
-                else:
-                    index_tilda = len(line)-1
+            if (NEWLINE in line):
+                index_tilda = line.index(NEWLINE)
             else:
-                if (COMMENT in line):
-                    index_tilda = line.index(COMMENT)
-                else:
-                    if (NEWLINE in line):
-                        index_tilda = line.index(NEWLINE)
-                    else:
-                        index_tilda = len(line)-1
+                index_tilda = len(line)-1
 
         parts = {
             START: line[:index_start],
@@ -493,6 +486,21 @@ def handle_hl_logic(item, index):
     return item
 
 
+class LXNumber:
+    counter = 1
+
+
+def handle_lx_num(item, index):
+    if (item[SEGMENT][0] == "CLM"):
+        LXNumber.counter = 1
+
+    if (item[SEGMENT][0] == "LX"):
+        item[SEGMENT][1] = str(LXNumber.counter)
+        LXNumber.counter += 1
+
+    return item
+
+
 def parse_arguments(args: list[str]):
     opts = {
         OPT_ID_LOOPS: False,
@@ -503,6 +511,7 @@ def parse_arguments(args: list[str]):
         OPT_GEN_UUID: False,
         OPT_HL_NUM: False,
         OPT_CLM_AMT: False,
+        OPT_LX_NUM: False,
 
         # Note that the string may have contridictor name
         # This being true imples we perform HL logic.
@@ -587,7 +596,8 @@ def print_opts(opts: dict):
     print(f"\tOutput File :: {bc.OKGREEN}{opts[OPT_OUT_FILE]}{bc.ENDC}")
 
     rest_of_opts = [OPT_FORMAT, OPT_ID_LOOPS, OPT_FIX_ERRORS,
-                    OPT_GEN_UUID, OPT_HL_NUM, OPT_HL_LOGIC, OPT_SEG_COUNT]
+                    OPT_GEN_UUID, OPT_HL_NUM, OPT_HL_LOGIC, OPT_SEG_COUNT,
+                    OPT_LX_NUM]
 
     for key in rest_of_opts:
         value = opts[key]
@@ -626,6 +636,9 @@ def fix_errors_module(index, item, opts, additions, deletions):
 
     if (opts[OPT_HL_LOGIC]):
         item = handle_hl_logic(item, index)
+
+    if (opts[OPT_LX_NUM]):
+        item = handle_lx_num(item, index)
 
     return item
 
@@ -671,12 +684,12 @@ def format_module(index, item, opts, additions, deletions):
     segment = item[SEGMENT]
 
     if (len(segment) == 0):
-        logs.append((index+1, "Removed empty line."))
+        # logs.append((index+1, "Removed empty line."))
         deletions.append(index)
         return item
 
     if segment[0].startswith("//"):
-        logs.append((index+1, "Removed comment line."))
+        # logs.append((index+1, "Removed comment line."))
         deletions.append(index)
         return item
 
@@ -755,7 +768,7 @@ def main():
             item = format_module(index, item, opts, additions, deletions)
 
     for index in reversed(deletions):
-        data.remove(index)
+        data.pop(index)
 
     offset = len(deletions)
 
